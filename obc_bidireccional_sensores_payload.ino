@@ -12,16 +12,22 @@ const int maxPacketSize = 256; // Maximum expected packet size, adjust as needed
 
 //Banderas para envio de sensores dependiendo de la opcion seleccionada desde el GS
 bool op1, op2, op3, op4, op5;
+bool seleccion_sensor = false;
+bool seleccion_tiempo = false;
+int tiempo_sensado = 0;
+int tiempo_inicial = 0;
+int tiempo_actual = 0;
 
 // RTC
 RTC_DS1307 rtc;
 bool rtc_enabled = false;
 String year, month, day, hour, minute, second;
+int int_tiempo;
 
 // GPS variables:
 SoftwareSerial GPS_SoftSerial(3, 4);
 TinyGPSPlus gps;
-double lat_val, lng_val;
+float lat_val, lng_val;
 bool gps_enabled = false;
 
 // MPU6050 variables:
@@ -39,8 +45,27 @@ Adafruit_BMP085 bmp;
 float altitude, pressure, tempr;
 bool bmp_enabled = false;
 
-Adafruit_INA219 ina219;
+//Adafruit_INA219 ina219;
 const int temt6000 = A1;
+
+// Variables para funcion de smart delay
+unsigned long currentMillis = 0;
+unsigned long previousMillis = 0;
+
+const long intervalGPS = 2000; // 2 segundos entre lecturas de GPS
+const long intervalIMU = 1000;  // 0.5 segundos entre lecturas de IMU
+const long intervalBMP = 2000; // 1 segundo entre lecturas de BMP
+const long intervalLUZ = 1000; // 0.5 segundos entre lecturas de BMP
+
+// Prototipos de las funciones
+void bmp_init();
+void imu_init();
+void gps_init();
+void rtc_init();
+void readbmp();
+void readRTC();
+void readIMU();
+void sendSensorData();
 
 void setup()
 {
@@ -57,8 +82,8 @@ void setup()
   }
 
   // housekeeping sensor init:
-  ina219.begin();
-  pinMode(temt6000,INPUT);
+//  ina219.begin();
+//  pinMode(temt6000,INPUT);
 
   // payload init:
   imu_init();
@@ -69,76 +94,119 @@ void setup()
 
 void loop()
 {
-  if(rtc_enabled) readRTC();
-
-  // Escucha de lora en espera de un comando
-  int packetSize = LoRa.parsePacket();
-  if (packetSize) {
-      Serial.print("Received Data From Satellite:\n");
-      char receivedData[maxPacketSize];
-      int bytesRead = LoRa.readBytes(receivedData, maxPacketSize);
   
-      receivedData[bytesRead] = '\0';
-      
-      // Condiciones para activar la bandera de la opcion seleccionada desde el GS y para leer el sensor que se requiere
-      //GPS
-      if (strcmp(receivedData, "a") == 0){
-        if(gps_enabled) readgps();
-        op1 = true;
-        op2 = false;
-        op3 = false;
-        op4 = false;
-        op5 = false;
-      } 
-      //IMU
-      else if (strcmp(receivedData, "b") == 0){
-        if(imu_enabled) readIMU();
-        op1 = false;
-        op2 = true;
-        op3 = false;
-        op4 = false;
-        op5 = false;
-      } 
-      //Sensor de presion y altitud
-      else if (strcmp(receivedData, "c") == 0){
-        if(bmp_enabled) readbmp();
-        op1 = false;
-        op2 = false;
-        op3 = true;
-        op4 = false;
-        op5 = false;
-      } 
-      // Sensor de luz
-      else if (strcmp(receivedData, "d") == 0){
-        op1 = false;
-        op2 = false;
-        op3 = false;
-        op4 = true;
-        op5 = false;
-      } 
-      //Sensor de temperatura del BMP
-      else if (strcmp(receivedData, "e") == 0){
-        if(bmp_enabled) readbmp();
-        op1 = false;
-        op2 = false;
-        op3 = false;
-        op4 = false;
-        op5 = true;
-      } 
-      // Condicion para detener el envio de datos
-      else if (strcmp(receivedData, "s") == 0){
-        op1 = false;
-        op2 = false;
-        op3 = false;
-        op4 = false;
-        op5 = false;
-
-      }
-//      Serial.println(receivedData);
-      sendSensorData();
+  if(rtc_enabled) readRTC();
+  if (!seleccion_sensor && !seleccion_tiempo){
+  
+    // Escucha de lora en espera de un comando
+    int packetSize = LoRa.parsePacket();
+    if (packetSize) {
+        Serial.print("Received Data From Satellite:\n");
+        char receivedData[maxPacketSize];
+        int bytesRead = LoRa.readBytes(receivedData, maxPacketSize);
+    
+        receivedData[bytesRead] = '\0';
+        
+        // Condiciones para activar la bandera de la opcion seleccionada desde el GS y para leer el sensor que se requiere
+        //GPS
+        if (strcmp(receivedData, "a") == 0){
+          seleccion_sensor = true;
+          Serial.println("Opcion a)");
+          op1 = true;
+        } 
+        //IMU
+        if (strcmp(receivedData, "b") == 0){
+          seleccion_sensor = true;
+          Serial.println("Opcion b)");
+          op2 = true;
+        } 
+        //Sensor de presion y altitud
+        if (strcmp(receivedData, "c") == 0){
+          seleccion_sensor = true;
+          Serial.println("Opcion c)");
+          op3 = true;
+        } 
+//        // Sensor de luz
+        if (strcmp(receivedData, "d") == 0){
+          seleccion_sensor = true;
+          Serial.println("Opcion d)");
+          op4 = true;
+        } 
+        
+        //Sensor de temperatura del BMP
+        if (strcmp(receivedData, "e") == 0){
+          seleccion_sensor = true;
+          Serial.println("Opcion e)");
+          op5 = true;
+        } 
+        
+    }
   }
-  delay(100);      // Adjust the delay according to your data sending rate
+  else if (seleccion_sensor && !seleccion_tiempo){
+    // Escucha de lora en espera de un comando
+    int packetSize = LoRa.parsePacket();
+    if (packetSize) {
+        Serial.print("Received Data From Satellite:\n");
+        char receivedData[maxPacketSize];
+        int bytesRead = LoRa.readBytes(receivedData, maxPacketSize);
+    
+        receivedData[bytesRead] = '\0';
+        
+        // Condiciones para asignar el tiempo de sensado
+        //10 segundos de datos
+        if (strcmp(receivedData, "a") == 0){
+          Serial.println("10 seg");
+          tiempo_sensado = 10;
+          seleccion_tiempo = true;
+        }
+        else if (strcmp(receivedData, "b") == 0){
+          Serial.println("30 seg");
+          tiempo_sensado = 30;
+          seleccion_tiempo = true;
+        }
+        else if (strcmp(receivedData, "c") == 0){
+          Serial.println("1 minuto");
+          tiempo_sensado = 60;
+          seleccion_tiempo = true;
+        }
+//        else if (strcmp(receivedData, "d") == 0){
+//          Serial.println("5 minutos");
+//          tiempo_sensado = 300;
+//          seleccion_tiempo = true;
+//        }
+//        else if (strcmp(receivedData, "e") == 0){
+//          Serial.println("10 minutos");
+//          tiempo_sensado = 600;
+//          seleccion_tiempo = true;
+//        }
+//        else if (strcmp(receivedData, "s") == 0){
+//          Serial.println("Proceso cancelado");
+//          tiempo_sensado = 0;
+//          seleccion_tiempo = false;
+//          seleccion_sensor = false;
+//        }
+    }
+  }
+
+  if (seleccion_sensor && seleccion_tiempo){
+    if(rtc_enabled) readRTC();
+    tiempo_actual = int_tiempo;
+    tiempo_inicial = tiempo_actual;
+    while(tiempo_actual-tiempo_inicial < tiempo_sensado){
+      if(rtc_enabled) readRTC();
+      tiempo_actual = int_tiempo;
+      sendSensorData();      
+    }
+    seleccion_tiempo = false;
+    seleccion_sensor = false;
+    op1 = false;
+    op2 = false;
+    op3 = false;
+    op4 = false;
+    op5 = false;
+  }
 }
+
 
 
 /* Initialization Code Start!*/
@@ -261,9 +329,9 @@ void readIMU()
   GyroY += GyroErrorY;
   GyroZ += GyroErrorZ;
 
-  gyroAngleX += GyroX * elapsedTime;
-  gyroAngleY += GyroY * elapsedTime;
-  yaw += GyroZ * elapsedTime;
+  gyroAngleX += GyroX; // * elapsedTime;
+  gyroAngleY += GyroY; // * elapsedTime;
+  yaw += GyroZ; // * elapsedTime;
 
   roll = 0.96 * gyroAngleX + 0.04 * accAngleX;
   pitch = 0.96 * gyroAngleY + 0.04 * accAngleY;
@@ -273,7 +341,7 @@ void readIMU()
 /* GPS Reading Functions Start!*/
 void readgps()
 {
-  smartDelay(1000);
+//  smartDelay(2000);
   bool loc_valid;
   loc_valid = gps.location.isValid();
   if(loc_valid)
@@ -282,33 +350,10 @@ void readgps()
     lng_val = gps.location.lng();
   }
   else{
-  lat_val = -1.000000;
-  lng_val = -1.000000;
+  lat_val = -1.00;
+  lng_val = -1.00;
   }
 }
-
-void readRTC()
-{
-//  smartDelay(1000);
-  DateTime now = rtc.now();
-  second = String(now.second());
-  minute = String(now.minute());
-  hour = String(now.hour());
-  day = String(now.day());
-  month = String(now.month());
-  year = String(now.year());
-}
-
-void smartDelay(unsigned long ms)
-{
-  unsigned long start = millis();
-  do 
-  {
-    while (GPS_SoftSerial.available()) 
-      gps.encode(GPS_SoftSerial.read());
-  } while (millis() - start < ms);
-}
-/* GPS Reading Functions End!*/
 
 /* BMP085 Reading Functions Start!*/
 void readbmp()
@@ -320,117 +365,121 @@ void readbmp()
 /* BMP085 Reading Functions End!*/
 
 
+void readRTC()
+{
+//  smartDelay(1000);
+  DateTime now = rtc.now();
+  second = String(now.second());
+  minute = String(now.minute());
+  hour = String(now.hour());
+//  day = String(now.day());
+//  month = String(now.month());
+//  year = String(now.year());
+  int_tiempo = hour.toInt()*3600 + minute.toInt()*60 + second.toInt();
+}
+
+
+
+
 void sendSensorData()
 {
-  float shuntvoltage = ina219.getShuntVoltage_mV();
-  float busvoltage = ina219.getBusVoltage_V();
-  float current_mA = ina219.getCurrent_mA();
-  float power_mW = ina219.getPower_mW();
-  float loadvoltage = busvoltage + (shuntvoltage / 1000);
-  int brightness = analogRead(temt6000);
+  currentMillis = millis();
 
   //Paquetes de cada sensor para enviar por lora 
-  String packet = "";
-  String reloj = "";
+//  String reloj = "";
   String imu = "";
   String GPS = "";
   String presion = "";
   String temp = "";
   String luz = "";
-  String data = "";
 
-  // Reloj
-  if(rtc_enabled)
-  {
-    reloj += hour;
-    reloj += ":";
-    reloj += minute;
-    reloj += ":";
-    reloj += second;
-    reloj += ".\n";
-  }
   //IMU
   if(imu_enabled && op2)
   {
-    imu += reloj;
-    imu += "Orientation (YPR): ";
-    imu += yaw;
-    imu += ", ";
-    imu += pitch;
-    imu += ", ";
-    imu += roll;
-    imu += ".\n";
-    Serial.println(imu);
-    LoRa.beginPacket();
-    LoRa.print(imu);
-    LoRa.endPacket();
+    if (currentMillis - previousMillis >= intervalIMU) {
+      previousMillis = currentMillis;
+      if (imu_enabled) {
+        readIMU();  // Función para leer IMU
+      }
+      imu += int_tiempo;
+      imu += "\n(YPR): ";
+      imu += yaw;
+      imu += ", ";
+      imu += pitch;
+      imu += ", ";
+      imu += roll;
+      imu += "\n";
+      LoRa.beginPacket();
+      LoRa.print(imu);
+      LoRa.endPacket();
+    }
+    
   }
   // GPS
   if(gps_enabled && op1)
   {
-    GPS += reloj;
-    GPS += "(Lat, Long): ";
-    GPS += String(lat_val,6);
-    GPS += ", ";
-    GPS += String(lng_val,6);
-    GPS += ".\n";
-    Serial.println(GPS);
-    LoRa.beginPacket();
-    LoRa.print(GPS);
-    LoRa.endPacket();
+    if (currentMillis - previousMillis >= intervalGPS) {
+      previousMillis = currentMillis;
+      if (gps_enabled) {
+        readgps();
+      }
+      GPS += int_tiempo;
+      GPS += "\n(Lat, Long): ";
+      GPS += String(lat_val,5);
+      GPS += ", ";
+      GPS += String(lng_val,5);
+      GPS += "\n";
+      LoRa.beginPacket();
+      LoRa.print(GPS);
+      LoRa.endPacket();
+    }
   }
+  
   //Sensor de presion y altitud
-  if(bmp_enabled && op3)
-  {
-    presion += reloj;
-    presion += "With altitude ";
-    presion += altitude;
-    presion += " m in , ";
-    presion += pressure;
-    presion += " hPa pressure &, ";
-    Serial.println(presion);
-    LoRa.beginPacket();
-    LoRa.print(presion);
-    LoRa.endPacket();
+  if(bmp_enabled && op3){
+    if (currentMillis - previousMillis >= intervalBMP) {
+      previousMillis = currentMillis;
+      if (bmp_enabled) {
+        readbmp();  // Función para leer BMP
+      }
+      presion += int_tiempo;
+      presion += "\n";
+      presion += pressure;
+      presion += " hPa";
+      LoRa.beginPacket();
+      LoRa.print(presion);
+      LoRa.endPacket();
+      }
+    
   }
   // Sensor de temperatura
   if(bmp_enabled && op5){
-    temp += reloj;
-    temp += tempr;
-    temp += "°C.\n";
-    Serial.println(temp);
-    LoRa.beginPacket();
-    LoRa.print(temp);
-    LoRa.endPacket();
+    if (currentMillis - previousMillis >= intervalBMP) {
+      previousMillis = currentMillis;
+      if (bmp_enabled) {
+        readbmp();  // Función para leer BMP
+      }
+      temp += int_tiempo;
+      temp += " \n";
+      temp += tempr;
+      temp += " C\n";
+      LoRa.beginPacket();
+      LoRa.print(temp);
+      LoRa.endPacket();
+      }
   }
   // Sensor de luz
   if(op4){
-    luz += reloj;
-    luz += " Brightness: ";
-    luz += brightness;
-    luz += " lm\n";
-    Serial.println(luz);
-    LoRa.beginPacket();
-    LoRa.print(luz);
-    LoRa.endPacket();
+    if (currentMillis - previousMillis >= intervalLUZ) {
+      previousMillis = currentMillis;
+      int brightness = analogRead(temt6000);
+      luz += int_tiempo;
+      luz += "\nBrightness: ";
+      luz += brightness;
+      luz += " lm\n";
+      LoRa.beginPacket();
+      LoRa.print(luz);
+      LoRa.endPacket();    
+    }
   }
 }
-
-//  data = "Bus & shunt voltage: ";
-//  data += busvoltage;
-//  data += " V &";
-//  data += shuntvoltage;
-//  data += " mV and";
-//  data += " Current: ";
-//  data += current_mA;
-//  data += " mA";
-//  data += " Brightness: ";
-//  data += brightness;
-//  data += " lm\n";
-  
-//  if(imu_enabled || gps_enabled || bmp_enabled || rtc_enabled) Serial.println(imu);
-////  Serial.println(data);
-//  LoRa.beginPacket();
-//  if(imu_enabled || gps_enabled || bmp_enabled || rtc_enabled) LoRa.print(imu);
-////  LoRa.print(data);
-//  LoRa.endPacket();
