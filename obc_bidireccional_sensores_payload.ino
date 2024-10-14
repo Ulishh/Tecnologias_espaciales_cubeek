@@ -81,10 +81,7 @@ void setup()
     while (1);
   }
 
-  // housekeeping sensor init:
-//  ina219.begin();
-//  pinMode(temt6000,INPUT);
-
+ 
   // payload init:
   imu_init();
   gps_init();
@@ -101,7 +98,6 @@ void loop()
     // Escucha de lora en espera de un comando
     int packetSize = LoRa.parsePacket();
     if (packetSize) {
-        Serial.print("Received Data From Satellite:\n");
         char receivedData[maxPacketSize];
         int bytesRead = LoRa.readBytes(receivedData, maxPacketSize);
     
@@ -146,7 +142,6 @@ void loop()
     // Escucha de lora en espera de un comando
     int packetSize = LoRa.parsePacket();
     if (packetSize) {
-        Serial.print("Received Data From Satellite:\n");
         char receivedData[maxPacketSize];
         int bytesRead = LoRa.readBytes(receivedData, maxPacketSize);
     
@@ -169,22 +164,6 @@ void loop()
           tiempo_sensado = 60;
           seleccion_tiempo = true;
         }
-//        else if (strcmp(receivedData, "d") == 0){
-//          Serial.println("5 minutos");
-//          tiempo_sensado = 300;
-//          seleccion_tiempo = true;
-//        }
-//        else if (strcmp(receivedData, "e") == 0){
-//          Serial.println("10 minutos");
-//          tiempo_sensado = 600;
-//          seleccion_tiempo = true;
-//        }
-//        else if (strcmp(receivedData, "s") == 0){
-//          Serial.println("Proceso cancelado");
-//          tiempo_sensado = 0;
-//          seleccion_tiempo = false;
-//          seleccion_sensor = false;
-//        }
     }
   }
 
@@ -329,9 +308,9 @@ void readIMU()
   GyroY += GyroErrorY;
   GyroZ += GyroErrorZ;
 
-  gyroAngleX += GyroX; // * elapsedTime;
-  gyroAngleY += GyroY; // * elapsedTime;
-  yaw += GyroZ; // * elapsedTime;
+  gyroAngleX += GyroX * elapsedTime;
+  gyroAngleY += GyroY * elapsedTime;
+  yaw += GyroZ * elapsedTime;
 
   roll = 0.96 * gyroAngleX + 0.04 * accAngleX;
   pitch = 0.96 * gyroAngleY + 0.04 * accAngleY;

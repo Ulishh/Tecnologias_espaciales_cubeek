@@ -56,7 +56,6 @@ void loop() {
   if (programacion){
     // Condicion para mostrar el menu de los sensores una vez
     if (!seleccion_sensor && !seleccion_tiempo){
-      menu_sensores();
       seleccion_sensor = true;
     }
   // Un vez mostrado el menu de los sensores se revisa el buffer del serial  
@@ -68,55 +67,41 @@ void loop() {
         char receivedChar = Serial.read();
         // Comparacion del caracter recibido en el buffer del serial
         if (receivedChar == 'a'){
-          Serial.println("GPS...");
           LoRa.beginPacket();
           LoRa.print('a');
           LoRa.endPacket();
-          menu_tiempo();
           seleccion_sensor = false;
           seleccion_tiempo = true;
         }
         if (receivedChar == 'b'){
-          Serial.println("IMU...");
           LoRa.beginPacket();
           LoRa.print('b');
           LoRa.endPacket();
-          menu_tiempo();
           seleccion_sensor = false;
           seleccion_tiempo = true;
         }
         if (receivedChar == 'c'){
-          Serial.println("Presion...");
           LoRa.beginPacket();
           LoRa.print('c');
           LoRa.endPacket();
-          menu_tiempo();
           seleccion_sensor = false;
           seleccion_tiempo = true;
         }
         if (receivedChar == 'd'){
-          Serial.println("Luz...");
           LoRa.beginPacket();
           LoRa.print('d');
           LoRa.endPacket();
-          menu_tiempo();
           seleccion_sensor = false;
           seleccion_tiempo = true;
         }
         if (receivedChar == 'e'){
-          Serial.println("Temperatura...");
           LoRa.beginPacket();
           LoRa.print('e');
           LoRa.endPacket();
-          menu_tiempo();
           seleccion_sensor = false;
           seleccion_tiempo = true;
         }
         if (receivedChar == 's'){
-          Serial.println("Cancelar");
-          LoRa.beginPacket();
-          LoRa.print('s');
-          LoRa.endPacket();
           seleccion_sensor = false;
           seleccion_tiempo = false;
           programacion = false;
@@ -131,7 +116,6 @@ void loop() {
         char receivedChar = Serial.read();
         // Comparacion del caracter recibido en el buffer del serial
         if (receivedChar == 'a'){
-            Serial.println("10 seg");
             LoRa.beginPacket();
             LoRa.print('a');
             LoRa.endPacket();
@@ -139,7 +123,6 @@ void loop() {
             programacion = false;
           }
           if (receivedChar == 'b'){
-            Serial.println("30 seg");
             LoRa.beginPacket();
             LoRa.print('b');
             LoRa.endPacket();
@@ -147,31 +130,13 @@ void loop() {
             programacion = false;
           }
           if (receivedChar == 'c'){
-            Serial.println("1 min");
             LoRa.beginPacket();
             LoRa.print('c');
             LoRa.endPacket();
             seleccion_tiempo = false;
             programacion = false;
           }
-          if (receivedChar == 'd'){
-            Serial.println("5 min");
-            LoRa.beginPacket();
-            LoRa.print('d');
-            LoRa.endPacket();
-            seleccion_tiempo = false;
-            programacion = false;
-          }
-          if (receivedChar == 'e'){
-            Serial.println("10 min");
-            LoRa.beginPacket();
-            LoRa.print('e');
-            LoRa.endPacket();
-            seleccion_tiempo = false;
-            programacion = false;
-          }
           if (receivedChar == 's'){
-            Serial.println("Cancelar");
             seleccion_tiempo = false;
             programacion = false;
             // Borra el display
@@ -195,7 +160,7 @@ void loop() {
   // Recibe los paquetes que mande el OBC y los despliega en el serial y la pantalla oled
     int packetSize = LoRa.parsePacket();
     if (packetSize) {
-      Serial.println("Received Data From Satellite:\n");
+//      Serial.println("Received Data From Satellite:\n");
       char receivedData[maxPacketSize];
       int bytesRead = LoRa.readBytes(receivedData, maxPacketSize);
       receivedData[bytesRead] = '\0';
@@ -211,30 +176,4 @@ void loop() {
       Serial.println();
     }
   }  
-}
-
-
-
-
-// Funcion para mostra el menu de los sensores del payload
-void menu_sensores(){
-  Serial.println("Sensores payload. Seleccione una opcion:");
-  Serial.println("a) GPS.");
-  Serial.println("b) IMU.");
-  Serial.println("c) Presion.");
-  Serial.println("d) Luz.");
-  Serial.println("e) Temperatura.");
-  Serial.println("s) Detener.");
-}
-
-// Funcion para mostrar las opciones disponibles de tiempo para obtener los datos
-// del sensor seleccionado
-void menu_tiempo(){
-  Serial.println("¿Cuanto tiempo desea obtener datos?");
-  Serial.println("a) 10 seg.");
-  Serial.println("b) 30 seg.");
-  Serial.println("c) 1 min.");
-  Serial.println("d) 5 min.");
-  Serial.println("e) 10 min.");
-  Serial.println("s) Cancelar.");
 }
