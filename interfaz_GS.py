@@ -3,9 +3,14 @@
 import sys
 import serial
 import time
+import re  # Librería para usar expresiones regulares
+import numpy as np
 from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget, QLabel
 from PyQt5 import QtCore, QtGui, QtWidgets
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -25,7 +30,6 @@ class Ui_MainWindow(object):
         self.textEdit.setGeometry(QtCore.QRect(180, 20, 271, 61))
         self.textEdit.setObjectName("textEdit")
         self.textEdit.setReadOnly(True)
-        # Aquí se configura el texto HTML del QTextEdit
         _translate = QtCore.QCoreApplication.translate
         self.textEdit.setHtml(_translate("MainWindow", 
             "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
@@ -85,8 +89,6 @@ class Ui_MainWindow(object):
         self.comboBox_2.addItem("a) 10 segundos")
         self.comboBox_2.addItem("b) 30 segundos")
         self.comboBox_2.addItem("c) 1 minuto")
-        self.comboBox_2.addItem("d) 5 minutos")
-        self.comboBox_2.addItem("e) 10 minutos")
         self.comboBox_2.addItem("s) Cancelar")
 
         self.Datos_serial = QtWidgets.QPlainTextEdit(self.centralwidget)
@@ -94,10 +96,20 @@ class Ui_MainWindow(object):
         self.Datos_serial.setReadOnly(True)
         self.Datos_serial.setObjectName("Datos_serial")
 
-        self.Grafica = QtWidgets.QPlainTextEdit(self.centralwidget)
-        self.Grafica.setGeometry(QtCore.QRect(320, 260, 261, 301))
-        self.Grafica.setReadOnly(True)
-        self.Grafica.setObjectName("Grafica")
+        # Crear layout para la gráfica
+        self.graph_widget = QWidget(self.centralwidget)
+        self.graph_widget.setGeometry(QtCore.QRect(320, 260, 261, 301))
+        self.graph_layout = QVBoxLayout(self.graph_widget)
+        
+        # Crear la figura para la gráfica
+        self.figure = plt.figure()
+        self.canvas = FigureCanvas(self.figure)
+        self.graph_layout.addWidget(self.canvas)
+
+        # self.Grafica = QtWidgets.QPlainTextEdit(self.centralwidget)
+        # self.Grafica.setGeometry(QtCore.QRect(320, 260, 261, 301))
+        # self.Grafica.setReadOnly(True)
+        # self.Grafica.setObjectName("Grafica")
 
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(MainWindow)
@@ -116,6 +128,15 @@ class Ui_MainWindow(object):
         self.timer.timeout.connect(self.leer_serial)
         self.timer.start(100)  # Revisar cada 100 ms
 
+        # Listas para almacenar los datos de tiempo (eje X) y los valores (eje Y)
+        self.tiempo = []
+        self.valores = []
+
+        # Crear un temporizador para actualizar la gráfica en intervalos regulares
+        # self.timerG = QTimer()
+        # self.timerG.timeout.connect(self.update_plot)
+        # self.timerG.start(1000)  # Actualiza cada 1 segundo
+
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "CUBEEK"))
@@ -132,11 +153,22 @@ class Ui_MainWindow(object):
         self.ModoEstatus.setStyleSheet("color: green;")
         self.ModoEstatus.setText("ON")
         self.Datos_serial.clear()
+        self.tiempo = []
+        self.valores = []
+        # Limpiar la figura y redibujar la gráfica
+        self.figure.clear()
+        self.canvas.draw()
     
     # Función para enviar el sensor seleccionado por el ComboBox
     def enviar_sensor(self):
         sensor_opcion = self.comboBox.currentText()[0]  # Extraer la letra seleccionada
         self.serial_port.write(sensor_opcion.encode())  # Enviar la opción al Arduino
+        if sensor_opcion == 'd':
+            self.grafica = True
+        elif sensor_opcion == 'e':
+            self.grafica = True
+        else:
+            self.grafica = False
                 
     # Función para enviar el tiempo seleccionado por el ComboBox_2
     def enviar_tiempo(self):
@@ -148,9 +180,54 @@ class Ui_MainWindow(object):
     # Función para leer datos del puerto serial
     def leer_serial(self):
         if self.serial_port.in_waiting > 0:  # Si hay datos disponibles
-            datos = self.serial_port.readline().decode('utf-8').strip()
+            # datos = self.serial_port.readline().decode('utf-8').strip()
+            datos = self.serial_port.read(self.serial_port.in_waiting).decode('utf-8').strip()
             self.Datos_serial.appendPlainText(datos)  # Mostrar los datos en el campo de texto
+
+            # Guardar los datos en un archivo .txt
+            with open("datos_recibidos.txt", "a") as archivo:  # "a" para modo adición (append)
+                archivo.write(datos + "\n")
+
+
+            if self.grafica == True:
+                # Dividir los datos en líneas
+                lineas = datos.splitlines()
+
+                # Inicializar una lista para los matches
+                matches = []
+
+                # Extraer números de cada línea
+                for datos in lineas:
+                    matches = re.findall(r'[-+]?\d*\.\d+|\d+', datos)  # Agregar todos los matches
+
+                if len(matches) >= 1:  # Asegurarse de que se han encontrado al menos un numero
+                    valor = float(matches[0])  # Segundo número como valor
+                    self.actualizar_grafica(valor)
                 
+
+    # Función para actualizar la gráfica
+    def actualizar_grafica(self, y):
+        self.tiempo.append(time.time())  # Agregar la marca de tiempo actual
+        self.valores.append(y)  # Agregar el nuevo valor
+
+        # Limpiar la figura y redibujar la gráfica
+        self.figure.clear()
+        ax = self.figure.add_subplot(111)
+        ax.plot(self.tiempo, self.valores, 'b-')
+        ax.set_title("Datos en tiempo real")
+        ax.set_xlabel("Tiempo")
+        ax.set_ylabel("Valor")
+
+         # Establecer límites de los ejes (ajusta según tus datos)
+        ax.set_xlim(min(self.tiempo) - 1, max(self.tiempo) + 1)  # Establece el límite del eje X
+        ax.set_ylim(min(self.valores) - 1, max(self.valores) + 1)  # Establece el límite del eje Y con un pequeño margen
+        
+        # Ajustar la escala de tiempo
+        ax.relim()
+        ax.autoscale_view()
+
+        self.canvas.draw()
+        
     # Cerrar el puerto serial cuando se cierre la aplicación
     def closeEvent(self, event):
         self.serial_port.close()

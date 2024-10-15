@@ -81,7 +81,6 @@ void setup()
     while (1);
   }
 
- 
   // payload init:
   imu_init();
   gps_init();
@@ -91,7 +90,6 @@ void setup()
 
 void loop()
 {
-  
   if(rtc_enabled) readRTC();
   if (!seleccion_sensor && !seleccion_tiempo){
   
