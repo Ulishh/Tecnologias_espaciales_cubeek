@@ -49,6 +49,7 @@ void setup() {
   display.clearDisplay();
   display.display();
 
+
 }
 
 void loop() {
@@ -97,6 +98,20 @@ void loop() {
         if (receivedChar == 'e'){
           LoRa.beginPacket();
           LoRa.print('e');
+          LoRa.endPacket();
+          seleccion_sensor = false;
+          seleccion_tiempo = true;
+        }
+        if (receivedChar == 'f'){
+          LoRa.beginPacket();
+          LoRa.print('f');
+          LoRa.endPacket();
+          seleccion_sensor = false;
+          seleccion_tiempo = true;
+        }
+        if (receivedChar == 'g'){
+          LoRa.beginPacket();
+          LoRa.print('g');
           LoRa.endPacket();
           seleccion_sensor = false;
           seleccion_tiempo = true;

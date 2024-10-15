@@ -81,13 +81,15 @@ class Ui_MainWindow(object):
         self.comboBox.addItem("c) Presión")
         self.comboBox.addItem("d) Luz")
         self.comboBox.addItem("e) Temperatura")
+        self.comboBox.addItem("f) Voltaje")
+        self.comboBox.addItem("g) Corriente")
         self.comboBox.addItem("s) Cancelar")
 
         self.comboBox_2 = QtWidgets.QComboBox(self.centralwidget)
         self.comboBox_2.setGeometry(QtCore.QRect(370, 150, 181, 31))
         self.comboBox_2.setObjectName("comboBox_2")
-        self.comboBox_2.addItem("a) 10 segundos")
-        self.comboBox_2.addItem("b) 30 segundos")
+        self.comboBox_2.addItem("a) 20 segundos")
+        self.comboBox_2.addItem("b) 40 segundos")
         self.comboBox_2.addItem("c) 1 minuto")
         self.comboBox_2.addItem("s) Cancelar")
 
@@ -105,11 +107,6 @@ class Ui_MainWindow(object):
         self.figure = plt.figure()
         self.canvas = FigureCanvas(self.figure)
         self.graph_layout.addWidget(self.canvas)
-
-        # self.Grafica = QtWidgets.QPlainTextEdit(self.centralwidget)
-        # self.Grafica.setGeometry(QtCore.QRect(320, 260, 261, 301))
-        # self.Grafica.setReadOnly(True)
-        # self.Grafica.setObjectName("Grafica")
 
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(MainWindow)
@@ -132,10 +129,6 @@ class Ui_MainWindow(object):
         self.tiempo = []
         self.valores = []
 
-        # Crear un temporizador para actualizar la gráfica en intervalos regulares
-        # self.timerG = QTimer()
-        # self.timerG.timeout.connect(self.update_plot)
-        # self.timerG.start(1000)  # Actualiza cada 1 segundo
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
@@ -161,11 +154,15 @@ class Ui_MainWindow(object):
     
     # Función para enviar el sensor seleccionado por el ComboBox
     def enviar_sensor(self):
-        sensor_opcion = self.comboBox.currentText()[0]  # Extraer la letra seleccionada
-        self.serial_port.write(sensor_opcion.encode())  # Enviar la opción al Arduino
-        if sensor_opcion == 'd':
+        self.sensor_opcion = self.comboBox.currentText()[0]  # Extraer la letra seleccionada
+        self.serial_port.write(self.sensor_opcion.encode())  # Enviar la opción al Arduino
+        if self.sensor_opcion == 'd':
             self.grafica = True
-        elif sensor_opcion == 'e':
+        elif self.sensor_opcion == 'e':
+            self.grafica = True
+        elif self.sensor_opcion == 'f':
+            self.grafica = True
+        elif self.sensor_opcion == 'g':
             self.grafica = True
         else:
             self.grafica = False
@@ -184,9 +181,34 @@ class Ui_MainWindow(object):
             datos = self.serial_port.read(self.serial_port.in_waiting).decode('utf-8').strip()
             self.Datos_serial.appendPlainText(datos)  # Mostrar los datos en el campo de texto
 
-            # Guardar los datos en un archivo .txt
-            with open("datos_recibidos.txt", "a") as archivo:  # "a" para modo adición (append)
-                archivo.write(datos + "\n")
+            if self.sensor_opcion == 'a':
+                # Guardar los datos en un archivo .txt
+                with open("gps.txt", "a") as archivo:  # "a" para modo adición (append)
+                    archivo.write(datos + "\n")
+            if self.sensor_opcion == 'b':
+                # Guardar los datos en un archivo .txt
+                with open("imu.txt", "a") as archivo:  # "a" para modo adición (append)
+                    archivo.write(datos + "\n")
+            if self.sensor_opcion == 'c':
+                # Guardar los datos en un archivo .txt
+                with open("presion.txt", "a") as archivo:  # "a" para modo adición (append)
+                    archivo.write(datos + "\n")
+            if self.sensor_opcion == 'd':
+                # Guardar los datos en un archivo .txt
+                with open("luz.txt", "a") as archivo:  # "a" para modo adición (append)
+                    archivo.write(datos + "\n")
+            if self.sensor_opcion == 'e':
+                # Guardar los datos en un archivo .txt
+                with open("temperatura.txt", "a") as archivo:  # "a" para modo adición (append)
+                    archivo.write(datos + "\n")
+            if self.sensor_opcion == 'f':
+                # Guardar los datos en un archivo .txt
+                with open("voltaje.txt", "a") as archivo:  # "a" para modo adición (append)
+                    archivo.write(datos + "\n")
+            if self.sensor_opcion == 'g':
+                # Guardar los datos en un archivo .txt
+                with open("corriente.txt", "a") as archivo:  # "a" para modo adición (append)
+                    archivo.write(datos + "\n")
 
 
             if self.grafica == True:
@@ -214,7 +236,7 @@ class Ui_MainWindow(object):
         self.figure.clear()
         ax = self.figure.add_subplot(111)
         ax.plot(self.tiempo, self.valores, 'b-')
-        ax.set_title("Datos en tiempo real")
+        ax.set_title("Monitoreo")
         ax.set_xlabel("Tiempo")
         ax.set_ylabel("Valor")
 
