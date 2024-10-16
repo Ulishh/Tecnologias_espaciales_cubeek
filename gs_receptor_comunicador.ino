@@ -19,9 +19,6 @@ const int maxPacketSize = 256; // Maximum expected packet size, adjust as needed
 
 // Variables bool para definir estados
 bool programacion = false;
-bool menu = false;
-bool recepcion = false;
-bool tiempo = false;
 bool seleccion_tiempo = false;
 bool seleccion_sensor = false;
 
@@ -55,18 +52,18 @@ void setup() {
 void loop() {
   // Modo de programacion
   if (programacion){
-    // Condicion para mostrar el menu de los sensores una vez
+    // Condicion para habilitar la seleccion del sensor
     if (!seleccion_sensor && !seleccion_tiempo){
       seleccion_sensor = true;
     }
-  // Un vez mostrado el menu de los sensores se revisa el buffer del serial  
-  // para verificar si se selecciono alguna opcion
+  // Condicional para mandar por lora la seleccion del sensor
     if (seleccion_sensor){
       // Funcion para revisar el buffer del serial
       if (Serial.available() > 0) {
         // Se lee el dato recibido
         char receivedChar = Serial.read();
         // Comparacion del caracter recibido en el buffer del serial
+        // GPS
         if (receivedChar == 'a'){
           LoRa.beginPacket();
           LoRa.print('a');
@@ -74,6 +71,7 @@ void loop() {
           seleccion_sensor = false;
           seleccion_tiempo = true;
         }
+        // IMU
         if (receivedChar == 'b'){
           LoRa.beginPacket();
           LoRa.print('b');
@@ -81,6 +79,7 @@ void loop() {
           seleccion_sensor = false;
           seleccion_tiempo = true;
         }
+        // Presion
         if (receivedChar == 'c'){
           LoRa.beginPacket();
           LoRa.print('c');
@@ -88,6 +87,7 @@ void loop() {
           seleccion_sensor = false;
           seleccion_tiempo = true;
         }
+        // Luz
         if (receivedChar == 'd'){
           LoRa.beginPacket();
           LoRa.print('d');
@@ -95,6 +95,7 @@ void loop() {
           seleccion_sensor = false;
           seleccion_tiempo = true;
         }
+        // Temperatura
         if (receivedChar == 'e'){
           LoRa.beginPacket();
           LoRa.print('e');
@@ -102,6 +103,7 @@ void loop() {
           seleccion_sensor = false;
           seleccion_tiempo = true;
         }
+        // Voltaje
         if (receivedChar == 'f'){
           LoRa.beginPacket();
           LoRa.print('f');
@@ -109,6 +111,7 @@ void loop() {
           seleccion_sensor = false;
           seleccion_tiempo = true;
         }
+        // Corriente
         if (receivedChar == 'g'){
           LoRa.beginPacket();
           LoRa.print('g');
@@ -116,6 +119,7 @@ void loop() {
           seleccion_sensor = false;
           seleccion_tiempo = true;
         }
+        // Cancelar
         if (receivedChar == 's'){
           seleccion_sensor = false;
           seleccion_tiempo = false;
@@ -125,11 +129,14 @@ void loop() {
           display.display();
         }
       }
+    // Condicional para mandar el tiempo seleccionado por lora 
     } else if (seleccion_tiempo){
+      // Se revisa el buffer del serial
       if (Serial.available() > 0) {
         // Lee el dato recibido
         char receivedChar = Serial.read();
         // Comparacion del caracter recibido en el buffer del serial
+        // 20 segundos
         if (receivedChar == 'a'){
             LoRa.beginPacket();
             LoRa.print('a');
@@ -137,6 +144,7 @@ void loop() {
             seleccion_tiempo = false;
             programacion = false;
           }
+        // 40 segundos
           if (receivedChar == 'b'){
             LoRa.beginPacket();
             LoRa.print('b');
@@ -144,6 +152,7 @@ void loop() {
             seleccion_tiempo = false;
             programacion = false;
           }
+        // 1 minuto
           if (receivedChar == 'c'){
             LoRa.beginPacket();
             LoRa.print('c');
@@ -151,6 +160,7 @@ void loop() {
             seleccion_tiempo = false;
             programacion = false;
           }
+        // Cancelar
           if (receivedChar == 's'){
             seleccion_tiempo = false;
             programacion = false;
@@ -161,26 +171,28 @@ void loop() {
       }
     }
   } 
+  // Condicional si el modo de programacion no esta activo
+  // Siempre esta en escucha en espera de comandos
   else if (!programacion){
-    //Revision si se activo el modo programacion
+    //Se revisa el buffer del serial
     if (Serial.available() > 0) {
         // Lee el dato recibido
         char receivedChar = Serial.read();
         
         // Verifica el caracter recibido y lo compara con las opciones disponibles 
+        //Revision si se activo el modo programacion
         if (receivedChar == 'q') {
           programacion = true;
         }
     }
-  // Recibe los paquetes que mande el OBC y los despliega en el serial y la pantalla oled
+  // Recibe los paquetes que mande el OBC por lora y los despliega en el serial y la pantalla oled
     int packetSize = LoRa.parsePacket();
     if (packetSize) {
-//      Serial.println("Received Data From Satellite:\n");
       char receivedData[maxPacketSize];
       int bytesRead = LoRa.readBytes(receivedData, maxPacketSize);
       receivedData[bytesRead] = '\0';
+      // Se imprimen los datos recibidos en el serial
       Serial.println(receivedData);
-      
       //Muestra en la pantalla oled el mensaje recibido por lora
       display.clearDisplay();         // Limpiar la pantalla
       display.setTextSize(1);         // Establecer el tamaño del texto
