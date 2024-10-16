@@ -45,6 +45,7 @@ Adafruit_BMP085 bmp;
 float altitude, pressure, tempr;
 bool bmp_enabled = false;
 
+// INA 219
 Adafruit_INA219 ina219;
 const int temt6000 = A1;
 
@@ -52,15 +53,13 @@ const int temt6000 = A1;
 unsigned long currentMillis = 0;
 unsigned long previousMillis = 0;
 
+// Intervalos de tiempo para la lectura de los sensores
 const long intervalSEN = 5000; // 5 segundos entre lecturas de GPS
-//const long intervalIMU = 5000;  // 5 segundos entre lecturas de IMU
-//const long intervalPRESS = 5000; // 1 segundo entre lecturas de BMP
 const long intervalTEMP = 1000; // 1 segundo entre lecturas de BMP
 const long intervalLUZ = 1000; // 0.5 segundos entre lecturas de BMP
 const long intervalINA = 2000; // 0.5 segundos entre lecturas de BMP
 
-
-// Prototipos de las funciones
+// Inicializacion de las funciones
 void bmp_init();
 void imu_init();
 void gps_init();
@@ -70,6 +69,7 @@ void readRTC();
 void readIMU();
 void sendSensorData();
 void smartDelay();
+
 
 void setup()
 {
@@ -98,6 +98,7 @@ void setup()
 void loop()
 {
 //  if(rtc_enabled) readRTC();
+// Condicional en la cual se selecciona el sensor para su lectura y envio
   if (!seleccion_sensor && !seleccion_tiempo){
   
     // Escucha de lora en espera de un comando
@@ -119,7 +120,7 @@ void loop()
           seleccion_sensor = true;
           op2 = true;
         } 
-        //Sensor de presion y altitud
+        //Sensor de presion
         if (strcmp(receivedData, "c") == 0){
           seleccion_sensor = true;
           op3 = true;
@@ -147,6 +148,7 @@ void loop()
         
     }
   }
+  // Condicional para el seleccionar el tiempo de sensado
   else if (seleccion_sensor && !seleccion_tiempo){
     // Escucha de lora en espera de un comando
     int packetSize = LoRa.parsePacket();
@@ -172,13 +174,14 @@ void loop()
         }
     }
   }
-
+// Condicional para enviar los datos de los sensores por el tiempo de sensado seleccionado
   if (seleccion_sensor && seleccion_tiempo){
     tiempo_inicial = millis()/1000;
     while(tiempo_actual-tiempo_inicial < (tiempo_sensado)){
       tiempo_actual = millis()/1000;
       sendSensorData();      
     }
+    // Se vuelven todas las banderas en false
     seleccion_tiempo = false;
     seleccion_sensor = false;
     op1 = false;
@@ -241,6 +244,7 @@ void rtc_init()
 
 /* Initialization Code End!*/
 
+// Funcion para calibrar el sensor una vez que se inicializa
 /* IMU Reading Functions Start!*/
 //void calculate_IMU_error()
 //{
@@ -374,15 +378,13 @@ void readRTC()
 }
 
 
-
-
+// Funcion para envio de datos de los sensores
 void sendSensorData()
 {
-  readRTC();
-  currentMillis = millis();
+  readRTC(); // Se lee el rtc para enviar el tiempo en cada paquete
+  currentMillis = millis(); // Se obtiene el tiempo transcurrido para enviar datos cada cierto intervalo de tiempo
 
   //Paquetes de cada sensor para enviar por lora 
-//  String reloj = "";
   String imu = "";
   String GPS = "";
   String presion = "";
@@ -474,6 +476,7 @@ void sendSensorData()
       }
   }
 
+  // Sensor INA (Bus voltage)
   if (op6){
     if (currentMillis - previousMillis >= intervalINA) {
       previousMillis = currentMillis;
@@ -488,6 +491,7 @@ void sendSensorData()
     }
   }
 
+  // Sensor INA (Current)
   if (op7){
     if (currentMillis - previousMillis >= intervalINA) {
       previousMillis = currentMillis;
