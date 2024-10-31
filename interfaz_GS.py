@@ -1,4 +1,3 @@
-
 import serial # Libreria para leer el serial
 import time # Libreria para timers
 import re  # Libreria para usar expresiones regulares
@@ -181,45 +180,53 @@ class Ui_MainWindow(object):
     def leer_serial(self):
         if self.serial_port.in_waiting > 0:  # Si hay datos disponibles
             # datos = self.serial_port.readline().decode('utf-8').strip()
-            datos = self.serial_port.read(self.serial_port.in_waiting).decode('utf-8').strip()
-            self.Datos_serial.appendPlainText(datos)  # Agregar los datos en el espacio de datos serial
-            # Condicionales para almacenar los datos de cada sensor en diferentes archivos txt, 
-            # adicionando los datos cada que se reciban en lugar de sobreescribir en su propio txt
-            if self.sensor_opcion == 'a':
-                with open("gps.txt", "a") as archivo:  # "a" para modo adición (append)
-                    archivo.write(datos + "\n")
-            if self.sensor_opcion == 'b':
-                with open("imu.txt", "a") as archivo: 
-                    archivo.write(datos + "\n")
-            if self.sensor_opcion == 'c':
-                with open("presion.txt", "a") as archivo: 
-                    archivo.write(datos + "\n")
-            if self.sensor_opcion == 'd':
-                with open("luz.txt", "a") as archivo:
-                    archivo.write(datos + "\n")
-            if self.sensor_opcion == 'e':
-                with open("temperatura.txt", "a") as archivo:  
-                    archivo.write(datos + "\n")
-            if self.sensor_opcion == 'f':
-                with open("voltaje.txt", "a") as archivo: 
-                    archivo.write(datos + "\n")
-            if self.sensor_opcion == 'g':
-                with open("corriente.txt", "a") as archivo:
-                    archivo.write(datos + "\n")
+            try:
 
-            # Condicional para hacer graficas si el sensor seleccionado activo la opcion de grafica 
-            if self.grafica == True:
-                # Dividir los datos en líneas
-                lineas = datos.splitlines()
-                # Inicializar una lista para los matches
-                matches = []
-                # Extraer números de cada línea ya sean enteros o decimales
-                for datos in lineas:
-                    matches = re.findall(r'[-+]?\d*\.\d+|\d+', datos)  # Agregar todos los matches
-                # Solo se actualiza la grafica si se encuentran al menos un numero
-                if len(matches) >= 1:
-                    valor = float(matches[0]) 
-                    self.actualizar_grafica(valor)
+                datos = self.serial_port.read(self.serial_port.in_waiting).decode('utf-8').strip()
+                self.Datos_serial.appendPlainText(datos)  # Agregar los datos en el espacio de datos serial
+                # Condicionales para almacenar los datos de cada sensor en diferentes archivos txt, 
+                # adicionando los datos cada que se reciban en lugar de sobreescribir en su propio txt
+                if self.sensor_opcion == 'a':
+                    with open("gps.txt", "a") as archivo:  # "a" para modo adición (append)
+                        archivo.write(datos + "\n")
+                if self.sensor_opcion == 'b':
+                    with open("imu.txt", "a") as archivo: 
+                        archivo.write(datos + "\n")
+                if self.sensor_opcion == 'c':
+                    with open("presion.txt", "a") as archivo: 
+                        archivo.write(datos + "\n")
+                if self.sensor_opcion == 'd':
+                    with open("luz.txt", "a") as archivo:
+                        archivo.write(datos + "\n")
+                if self.sensor_opcion == 'e':
+                    with open("temperatura.txt", "a") as archivo:  
+                        archivo.write(datos + "\n")
+                if self.sensor_opcion == 'f':
+                    with open("voltaje.txt", "a") as archivo: 
+                        archivo.write(datos + "\n")
+                if self.sensor_opcion == 'g':
+                    with open("corriente.txt", "a") as archivo:
+                        archivo.write(datos + "\n")
+
+                # Condicional para hacer graficas si el sensor seleccionado activo la opcion de grafica 
+                if self.grafica == True:
+                    # Dividir los datos en líneas
+                    lineas = datos.splitlines()
+                    # Inicializar una lista para los matches
+                    matches = []
+                    # Extraer números de cada línea ya sean enteros o decimales
+                    for datos in lineas:
+                        matches = re.findall(r'[-+]?\d*\.\d+|\d+', datos)  # Agregar todos los matches
+                    # Solo se actualiza la grafica si se encuentran al menos un numero
+                    if len(matches) >= 1:
+                        valor = float(matches[0]) 
+                        self.actualizar_grafica(valor)
+                return datos
+            except UnicodeDecodeError as e:
+                # Maneja el error de decodificacion sin cerrar el programa
+                print(f"Error de decodificacion: {e}")
+                datos = ""
+                return datos # Opcional: retorna una cadena vacia o realiza otro tipo de manejo
                 
 
     # Función para actualizar la gráfica
