@@ -42,12 +42,19 @@ void setup() {
     while (1);
   }
 
-  // Limpiar la pantalla oled al inicio
-  display.clearDisplay();
-  display.display();
-
-
+  // Mostrar ground station al inicio
+  // Solo usar con fin demostrativo, para obtener los datos al lanzar el satelite en ocasiones se congela
+  // debido a la poca memoria de procesamiento de la arduino nano, por eso al hacer pruebas comentamos estas lineas
+  display.clearDisplay();         // Limpiar la pantalla
+  display.setTextSize(2);         // Establecer el tamaño del texto
+  display.setTextColor(WHITE);    // Establecer color del texto
+  display.setCursor(0, 0);      // Posicionar el cursor en el centro
+  display.println("Ground");               // Imprimir el texto
+  display.print("Station");
+  display.display();              // Mostrar en la pantalla
+  delay(5000);
 }
+
 
 void loop() {
   // Modo de programacion

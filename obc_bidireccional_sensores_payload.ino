@@ -2,10 +2,13 @@
 #include <Wire.h>
 #include <SoftwareSerial.h>
 #include <LoRa.h>
+#include "I2Cdev.h"
+#include "MPU6050.h"
 #include <Adafruit_BMP085.h>
 #include <TinyGPS++.h>
 #include <Adafruit_INA219.h>
 #include <RTClib.h>
+#include <math.h>
 
 //LORA
 const int maxPacketSize = 256; // Maximum expected packet size, adjust as needed
@@ -30,15 +33,18 @@ TinyGPSPlus gps;
 float lat_val, lng_val;
 bool gps_enabled = false;
 
-// MPU6050 variables:
-const int MPU = 0x69; // MPU6050 I2C address for AD0 High
-float AccX, AccY, AccZ;
-float GyroX, GyroY, GyroZ;
-float accAngleX, accAngleY, gyroAngleX, gyroAngleY, gyroAngleZ;
-float roll, pitch, yaw;
-float AccErrorX, AccErrorY, GyroErrorX, GyroErrorY, GyroErrorZ;
-float elapsedTime, currentTime, previousTime;
-bool imu_enabled = false;
+/*********** IMU ***********/
+// La dirección del MPU6050 puede ser 0x68 o 0x69, dependiendo 
+// del estado de AD0. Si no se especifica, 0x68 estará implicito
+//MPU6050 sensor;
+MPU6050 sensor(0x69);
+// Valores RAW (sin procesar) del acelerometro y giroscopio en los ejes x,y,z
+int ax, ay, az;
+int gx, gy, gz;
+long tiempo_prev;
+float dt;
+float ang_x, ang_y, ang_z;
+float ang_x_prev, ang_y_prev, ang_z_prev;
 
 // BMP085 variables:
 Adafruit_BMP085 bmp;
@@ -54,14 +60,14 @@ unsigned long currentMillis = 0;
 unsigned long previousMillis = 0;
 
 // Intervalos de tiempo para la lectura de los sensores
-const long intervalSEN = 5000; // 5 segundos entre lecturas de GPS
-const long intervalTEMP = 1000; // 1 segundo entre lecturas de BMP
-const long intervalLUZ = 1000; // 0.5 segundos entre lecturas de BMP
+const long intervalSEN = 200; // 5 segundos entre lecturas de GPS
+const long intervalIMU = 200; // 5 segundos entre lecturas de GPS
+const long intervalTEMP = 500; // 1 segundo entre lecturas de BMP
+const long intervalLUZ = 200; // 0.5 segundos entre lecturas de BMP
 const long intervalINA = 2000; // 0.5 segundos entre lecturas de BMP
 
 // Inicializacion de las funciones
 void bmp_init();
-void imu_init();
 void gps_init();
 void rtc_init();
 void readbmp();
@@ -76,6 +82,17 @@ void setup()
 //  Serial.begin(9600); 
 //  while (!Serial);
 //  Serial.println("CUBEEK Initializing...");
+  Wire.begin();           //Iniciando I2C  
+  sensor.initialize();    //Iniciando el sensor
+//  if (sensor.testConnection()) Serial.println("Sensor iniciado correctamente");
+//  else Serial.println("Error al iniciar el sensor");
+  // Valores de una calibracion previa del IMU
+  sensor.setXAccelOffset(-4937);
+  sensor.setYAccelOffset(-2338);
+  sensor.setZAccelOffset(1167);
+  sensor.setXGyroOffset(325);
+  sensor.setYGyroOffset(49);
+  sensor.setZGyroOffset(-5);
 
   // communication init:
   LoRa.setPins(8, 9, 2);
@@ -89,7 +106,6 @@ void setup()
   ina219.begin();
 
   // payload init:
-  imu_init();
   gps_init();
   bmp_init();
   rtc_init();
@@ -213,16 +229,7 @@ void bmp_init()
   }
 }
 
-void imu_init()
-{
-  imu_enabled = true;
-  Wire.begin();
-  Wire.beginTransmission(MPU);
-  Wire.write(0x6B);
-  Wire.write(0x00);
-  Wire.endTransmission(true);
-//  calculate_IMU_error();
-}
+
 
 void rtc_init()
 {
@@ -244,84 +251,24 @@ void rtc_init()
 
 /* Initialization Code End!*/
 
-// Funcion para calibrar el sensor una vez que se inicializa
-/* IMU Reading Functions Start!*/
-//void calculate_IMU_error()
-//{
-//  int c = 0;
-//
-//  while (c < 200)
-//  {
-//    Wire.beginTransmission(MPU);
-//    Wire.write(0x3B);
-//    Wire.endTransmission(false);
-//    Wire.requestFrom(MPU, 6, true);
-//    AccX = (Wire.read() << 8 | Wire.read()) / 16384.0;
-//    AccY = (Wire.read() << 8 | Wire.read()) / 16384.0;
-//    AccZ = (Wire.read() << 8 | Wire.read()) / 16384.0;
-//    AccErrorX += atan((AccY) / sqrt(pow((AccX), 2) + pow((AccZ), 2))) * 180 / PI;
-//    AccErrorY += atan(-1 * (AccX) / sqrt(pow((AccY), 2) + pow((AccZ), 2))) * 180 / PI;
-//    c++;
-//  }
-//  AccErrorX /= 200;
-//  AccErrorY /= 200;
-//
-//  c = 0;
-//
-//  while (c < 200)
-//  {
-//    Wire.beginTransmission(MPU);
-//    Wire.write(0x43);
-//    Wire.endTransmission(false);
-//    Wire.requestFrom(MPU, 6, true);
-//    GyroX = (Wire.read() << 8 | Wire.read()) / 131.0;
-//    GyroY = (Wire.read() << 8 | Wire.read()) / 131.0;
-//    GyroZ = (Wire.read() << 8 | Wire.read()) / 131.0;
-//    GyroErrorX += GyroX / 131.0;
-//    GyroErrorY += GyroY / 131.0;
-//    GyroErrorZ += GyroZ / 131.0;
-//    c++;
-//  }
-//  GyroErrorX /= 200;
-//  GyroErrorY /= 200;
-//  GyroErrorZ /= 200;
-//}
 
 void readIMU() 
 {
-  Wire.beginTransmission(MPU);
-  Wire.write(0x3B);
-  Wire.endTransmission(false);
-  Wire.requestFrom(MPU, 6, true);
-  AccX = (Wire.read() << 8 | Wire.read()) / 16384.0;
-  AccY = (Wire.read() << 8 | Wire.read()) / 16384.0;
-  AccZ = (Wire.read() << 8 | Wire.read()) / 16384.0;
-
-  accAngleX = (atan(AccY / sqrt(pow(AccX, 2) + pow(AccZ, 2))) * 180 / PI) - AccErrorX;
-  accAngleY = (atan(-1 * AccX / sqrt(pow(AccY, 2) + pow(AccZ, 2))) * 180 / PI) + AccErrorY;
-
-  previousTime = currentTime;
-  currentTime = millis();
-  elapsedTime = (currentTime - previousTime) / 1000;
-
-  Wire.beginTransmission(MPU);
-  Wire.write(0x43);
-  Wire.endTransmission(false);
-  Wire.requestFrom(MPU, 6, true);
-  GyroX = (Wire.read() << 8 | Wire.read()) / 131.0;
-  GyroY = (Wire.read() << 8 | Wire.read()) / 131.0;
-  GyroZ = (Wire.read() << 8 | Wire.read()) / 131.0;
-
-  GyroX += GyroErrorX;
-  GyroY += GyroErrorY;
-  GyroZ += GyroErrorZ;
-
-  gyroAngleX += GyroX * elapsedTime;
-  gyroAngleY += GyroY * elapsedTime;
-  yaw += GyroZ * elapsedTime;
-
-  roll = 0.96 * gyroAngleX + 0.04 * accAngleX;
-  pitch = 0.96 * gyroAngleY + 0.04 * accAngleY;
+  // Leer las aceleraciones y velocidades angulares
+  sensor.getAcceleration(&ax, &ay, &az);
+  sensor.getRotation(&gx, &gy, &gz);
+  
+  float accel_ang_x=atan(ay/sqrt(pow(ax,2) + pow(az,2)))*(180.0/PI);
+  float accel_ang_y=atan(-ax/sqrt(pow(ay,2) + pow(az,2)))*(180.0/PI);
+//Calcular angulo de rotación con giroscopio y filtro complemento  
+  dt = (millis()-tiempo_prev)/1000.0;
+  tiempo_prev=millis();
+  ang_x = 0.98*(ang_x_prev+(gx/131)*dt) + 0.02*accel_ang_x;
+  ang_y = 0.98*(ang_y_prev+(gy/131)*dt) + 0.02*accel_ang_y;
+  ang_z = ang_z_prev+(gz/131)* dt;
+  ang_x_prev=ang_x;
+  ang_y_prev=ang_y;
+  ang_z_prev=ang_z;
 }
 /* IMU Reading Functions End!*/
 
@@ -412,18 +359,18 @@ void sendSensorData()
   }
 
   //IMU
-  if(imu_enabled && op2)
+  if(op2)
   {
-    if (currentMillis - previousMillis >= intervalSEN) {
+    if (currentMillis - previousMillis >= intervalIMU) {
       previousMillis = currentMillis;
       readIMU();  // Función para leer IMU
       imu += int_tiempo;
       imu += "\n(YPR): ";
-      imu += yaw;
+      imu += ang_z;
       imu += ", ";
-      imu += pitch;
+      imu += ang_y;
       imu += ", ";
-      imu += roll;
+      imu += ang_x;
       imu += "\n";
       LoRa.beginPacket();
       LoRa.print(imu);
